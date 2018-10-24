@@ -94,20 +94,20 @@
 		    (setq not-indented nil)))))
 	  )
 	(save-excursion
-	  ;;Check if the previous line (and only that) is continued by a backslash.
-	  ;;Then we want to indent, but we don't want to indent multiple steps for
-	  ;;multiple continuations.
+	  ;;Check if the previous line (and only that) is continued by a "\".
+	  ;;Then we want to indent, but we don't want to indent multiple steps
+	  ;;for multiple continuations.
 	  (forward-line -1)
 	  (when (looking-at "^.*\\\\")
 	    ;;When the previos line is continued [\], we want to indent 1 level
 	    ;;above the first continued line. Which is why we loop back to find
 	    ;;the first continued line
-	    (while (looking-at "^.*\\\\")
+	    (while (and (looking-at "^.*\\\\") (not (bobp)))
 	      (forward-line -1)
 	      )
 	    (progn
-		;;Do the actual indenting
-		(setq cur-indent (+ (current-indentation) epoch-indent-level)))
+	      ;;Do the actual indenting
+	      (setq cur-indent (+ (current-indentation) epoch-indent-level)))
 	    ))
 	)
       (if cur-indent
@@ -121,12 +121,14 @@
 
 (defvar epoch-mode-syntax-table
   (let((st (make-syntax-table)))
-
+    ;; underscore is part of a word
     (modify-syntax-entry ?_ "w" st)
-
+    ;; # used for comments, newline breaks commets
     (modify-syntax-entry ?# "<" st)
-    (modify-syntax-entry ?\\ "<" st)
     (modify-syntax-entry ?\n ">" st)
+    ;; \ breaks lines, everything following is ignored
+    ;; (effectively a comments)
+    (modify-syntax-entry ?\\ "<" st)
     st)
   "Syntax table for epoch-mode")
 

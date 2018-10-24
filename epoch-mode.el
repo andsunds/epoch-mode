@@ -29,10 +29,14 @@
 
 (defconst epoch-font-lock-keywords-1
   (list
+   ;'("\\(\\(begin:\\|end:\\).*\\)" . font-lock-bultin-face)
    ;; Some of the basic EOPCH blocks have begin: end:
    ;; control  boundaries  species  laser  fields window  output  
    ;; output_global dist_fn probe  collisions  qed  subset  constant
-   '("\\(begin:\\(?:boundaries\\|co\\(?:llisions\\|n\\(?:stant\\|trol\\)\\)\\|dist_fn\\|fields\\|laser\\|output\\(?:_global\\)?\\|probe\\|qed\\|s\\(?:pecies\\|ubset\\)\\|window\\)\\|end:\\(?:boundaries\\|co\\(?:llisions\\|n\\(?:stant\\|trol\\)\\)\\|dist_fn\\|fields\\|laser\\|output\\(?:_global\\)?\\|probe\\|qed\\|s\\(?:pecies\\|ubset\\)\\|window\\)\\)" . font-lock-builtin-face))
+   '("\\(\\(begin:\\|end:\\)\\(?:boundaries\\|co\\(?:llisions\\|n\\(?:stant\\|trol\\)\\)\\|dist_fn\\|fields\\|laser\\|output\\(?:_global\\)?\\|probe\\|qed\\|s\\(?:pecies\\|ubset\\)\\|window\\)\\)" . font-lock-keyword-face)
+   ;; True and False are represented by "T" and "F"
+   '("\\<\\(T\\|F\\)\\>" . font-lock-constant-face)
+   )
   "Minimal highlighting expressions for EPOCH mode.")
 
 ;; (defconst epoch-font-lock-keywords-2

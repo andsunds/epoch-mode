@@ -14,11 +14,12 @@
 (defvar epoch-mode-hook nil)
 
 ;;
-;(defvar epoch-mode-map
-;  (let ((epoch-mode-map (make-sparse-keymap)))
-;    (define-key epoch-mode-map "\C-j" 'newline-and-indent)
-;    epoch-mode-map)
-;  "Keymap for EPOCH major mode")
+(defvar epoch-mode-map
+  (let ((epoch-mode-map (make-sparse-keymap)))
+    ;;(define-key epoch-mode-map "\C-j" 'newline-and-indent)
+    (define-key epoch-mode-map "\C-c]" 'epoch-close-block)
+    epoch-mode-map)
+  "Keymap for EPOCH major mode")
 
 ;; 
 (add-to-list 'auto-mode-alist '("\\.deck\\'" . epoch-mode))
@@ -62,14 +63,19 @@
       (indent-line-to 0) ;First line is always non-indented
     (let ((not-indented t) cur-indent)
       (if (looking-at "^[ \t]*end:")
-	  ;;If the line we are looking at is the end
-	  ;;of a block, then decrease the indentation
+	  ;;If the line we are looking at is the end of a block,
+	  ;;then set the indentation to the same level as the begin
 	  (progn
 	    (save-excursion
 	      ;;Sets the cur-indent to one indentation less
 	      ;;than the previous line (decreasing indentation).
-	      (forward-line -1)
-	      (setq cur-indent (- (current-indentation) epoch-indent-offset))
+	      (while (and (not (looking-at "^[ \t]*begin:")) (not (bobp)))
+		;;(print "Have not found begin:")
+		(forward-line -1)
+		)
+	      ;;(forward-line -1)
+	      ;;(setq cur-indent (- (current-indentation) epoch-indent-offset))
+	      (setq cur-indent (current-indentation))
 	      )
 	    (if (< cur-indent 0)
 		;;If this is beyond the left margin,
@@ -124,6 +130,32 @@
 	(indent-line-to 0))
       ))) ; If we didn't see an indentation hint, then allow no indentation
 
+;;;;;;;;;;;;;;;;;;;; Block closure ;;;;;;;;;;;;;;;;;;;;
+(defun epoch-close-block ()
+  "Closes code blocks in EPOCH"
+  (interactive)
+  (beginning-of-line)
+  ;;This is the regex to match
+  (setq block-begin-regexp "^\\([[:blank:]]*\\)begin:\\([a-z][a-z0-9_]+\\)")
+  ;;(setq block-begin-regexp "^[[:space:]]*begin:\\([:alpha:][[:alnum:]_]+\\)")
+  (save-excursion
+    (while (and (not (looking-at block-begin-regexp)) (not (bobp)))
+      ;;Go back until you found a block begin:
+      (forward-line -1))
+    ;;(print (thing-at-point 'line t)) ; DEBUG
+    ;;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Simple-Match-Data.html
+    ;;Match a the line one more time to save the matched group.
+    (string-match block-begin-regexp (thing-at-point 'line t))
+    ;;The two matched groups are then saved to variables
+    (setq block-indent (match-string 1 (thing-at-point 'line t))) ;indentation level of begin
+    (setq block-type (match-string 2 (thing-at-point 'line t))) ;the block type
+    ;;(print block-indent) ; DEBUG
+    )
+  ;;inserts the actual end:...
+  ;;(insert (concat "\nend:" block-type))
+  (insert (concat "\n" block-indent "end:" block-type))
+  )
+
 ;;;;;;;;;;;;;;;;;;;; Syntax Table ;;;;;;;;;;;;;;;;;;;;
 
 (defvar epoch-mode-syntax-table
@@ -141,7 +173,7 @@
 (defun epoch-mode ()
   (interactive)
   (kill-all-local-variables)
-  ;(use-local-map epoch-mode-map)
+  (use-local-map epoch-mode-map)
   (set-syntax-table epoch-mode-syntax-table)
   ;; Set up font-lock
   (set (make-local-variable 'font-lock-defaults) '(epoch-font-lock-keywords))

@@ -10,32 +10,32 @@
 ;; (c) 2018, Andréas Sundström
 ;;
 
-
+;; Mode hook for use by outside functions
 (defvar epoch-mode-hook nil)
 
 ;;
-;; (defvar epoch-mode-map
-;;   (let ((epoch-mode-map (make-sparse-keymap)))
-;;     (define-key epoch-mode-map "\C-j" 'newline-and-indent)
-;;     epoch-mode-map)
-;;   "Keymap for EPOCH major mode")
+;(defvar epoch-mode-map
+;  (let ((epoch-mode-map (make-sparse-keymap)))
+;    (define-key epoch-mode-map "\C-j" 'newline-and-indent)
+;    epoch-mode-map)
+;  "Keymap for EPOCH major mode")
 
 ;; 
 (add-to-list 'auto-mode-alist '("\\.deck\\'" . epoch-mode))
 
 
-
 ;;;;;;;;;;;;;;;;;;;; HIGHLIGHTING ;;;;;;;;;;;;;;;;;;;;
-
 (defconst epoch-font-lock-keywords-1
   (list
    ;'("\\(\\(begin:\\|end:\\).*\\)" . font-lock-bultin-face)
-   ;; Some of the basic EOPCH blocks have begin: end:
+   ;; Some of the basic EOPCH blocks have begin:x end:x, where
+   ;; x is one of:
    ;; control  boundaries  species  laser  fields window  output  
-   ;; output_global dist_fn probe  collisions  qed  subset  constant
-   '("\\(\\(begin:\\|end:\\)\\(?:boundaries\\|co\\(?:llisions\\|n\\(?:stant\\|trol\\)\\)\\|dist_fn\\|fields\\|laser\\|output\\(?:_global\\)?\\|probe\\|qed\\|s\\(?:pecies\\|ubset\\)\\|window\\)\\)" . font-lock-keyword-face)
+   ;; output_global  dist_fn probe  collisions  qed  subset  constant
+   ;; Output from (regexp-opt '("..." "...")):
+   '("\\_<\\(\\(?:begin:\\|end:\\)\\(?:boundaries\\|co\\(?:llisions\\|n\\(?:stant\\|trol\\)\\)\\|dist_fn\\|fields\\|laser\\|output\\(?:_global\\)?\\|probe\\|qed\\|s\\(?:pecies\\|ubset\\)\\|window\\)\\)\\_>" . font-lock-keyword-face)
    ;; True and False are represented by "T" and "F"
-   '("\\<\\(T\\|F\\)\\>" . font-lock-constant-face)
+   '("\\<\\(?:T\\|F\\)\\>" . font-lock-constant-face)
    )
   "Minimal highlighting expressions for EPOCH mode.")
 
@@ -52,7 +52,7 @@
 
 
 ;;;;;;;;;;;;;;;;;;;; INDENTATION ;;;;;;;;;;;;;;;;;;;;
-(defvar epoch-indent-level 3) ; Indentation level
+(defvar epoch-indent-offset 3) ; Indentation level
 
 (defun epoch-indent-line ()
   "Indent current line as EPOCH code."
@@ -69,7 +69,7 @@
 	      ;;Sets the cur-indent to one indentation less
 	      ;;than the previous line (decreasing indentation).
 	      (forward-line -1)
-	      (setq cur-indent (- (current-indentation) epoch-indent-level))
+	      (setq cur-indent (- (current-indentation) epoch-indent-offset))
 	      )
 	    (if (< cur-indent 0)
 		;;If this is beyond the left margin,
@@ -90,7 +90,7 @@
 		  ;;This hint indicates that we need to indent an extra level
 		  (progn
 		    ;;Do the actual indenting:
-		    (setq cur-indent (+ (current-indentation) epoch-indent-level)) 
+		    (setq cur-indent (+ (current-indentation) epoch-indent-offset)) 
 		    (setq not-indented nil)) ;breaking the while loop
 		(if (bobp)
 		    ;;Break the backward looking while loop when we've reached the
@@ -103,15 +103,18 @@
 	  ;;for multiple continuations.
 	  (forward-line -1)
 	  (when (looking-at "^.*\\\\")
-	    ;;When the previos line is continued [\], we want to indent 1 level
+	    ;;When the previos line is continued "\", we want to indent 1 level
 	    ;;above the first continued line. Which is why we loop back to find
 	    ;;the first continued line
 	    (while (and (looking-at "^.*\\\\") (not (bobp)))
 	      (forward-line -1)
 	      )
-	    (progn
-	      ;;Do the actual indenting
-	      (setq cur-indent (+ (current-indentation) epoch-indent-level)))
+	    ;;Go back to the last line visited which was continued.
+	    ;;(This is the first line which was continued.)
+	    (if (not (bobp))
+		(forward-line 1))
+	    ;;Indent one level above that line.
+	    (setq cur-indent (+ (current-indentation) epoch-indent-offset))
 	    ))
 	)
       (if cur-indent
@@ -124,16 +127,14 @@
 ;;;;;;;;;;;;;;;;;;;; Syntax Table ;;;;;;;;;;;;;;;;;;;;
 
 (defvar epoch-mode-syntax-table
-  (let((st (make-syntax-table)))
-    ;; underscore is part of a word
-    (modify-syntax-entry ?_ "w" st)
+  (let((syn-tab (make-syntax-table)))
     ;; # used for comments, newline breaks commets
-    (modify-syntax-entry ?# "<" st)
-    (modify-syntax-entry ?\n ">" st)
+    (modify-syntax-entry ?# "<" syn-tab)
+    (modify-syntax-entry ?\n ">" syn-tab)
     ;; \ breaks lines, everything following is ignored
     ;; (effectively a comments)
-    (modify-syntax-entry ?\\ "<" st)
-    st)
+    (modify-syntax-entry ?\\ "<" syn-tab)
+    syn-tab)
   "Syntax table for epoch-mode")
 
 ;;;;;;;;;;;;;;;;;;;; The epoch-mode function ;;;;;;;;;;;;;;;;;;;;

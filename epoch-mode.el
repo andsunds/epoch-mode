@@ -130,31 +130,102 @@
 	(indent-line-to 0))
       ))) ; If we didn't see an indentation hint, then allow no indentation
 
+(defun epoch-forward-logical-line (&optional N)
+  "Move point like `forward-line' but consider logical lines.
+This function takes line continuation through ?\\\\ into account."
+  (interactive "p")
+  (unless N
+    (setq N 1))
+  (if (> N 0)
+	(while
+	    (and
+	     (progn
+	       ;; Check for continuation line
+	       (while (and (let ((line-end (line-end-position)))
+			     (save-excursion
+			       (< (+ (point) (skip-chars-forward "^\\\\" line-end))
+				  line-end)))
+			   (= (forward-line) 0)))
+	       (= (forward-line) 0))
+	       ;; Count down
+	     (> (cl-decf N) 0)))
+    (forward-line 0)
+    (while
+	(and
+	 (null (bobp))
+	 (or
+	  ;; Check for continuation line
+	  (let ((prev-beg (line-beginning-position 0)))
+	    (save-excursion
+	      (> (+ (point) (skip-chars-backward "^\\\\" prev-beg))
+		 prev-beg)))
+	  (and (< N 0)
+	       (when (= (forward-line -1) 0)
+		 (cl-incf N)))))))
+  N)
+
+(defun epoch-logical-line-beginning-position (&optional N)
+  "Do the same as `line-beginning-position' but count logical lines."
+  (unless N
+    (setq N 0))
+  (save-excursion
+    (epoch-forward-logical-line N)
+    (point)))
+
+(defun epoch-logical-line-end-position (&optional N)
+  "Do the same as `line-end-position' but count logical lines."
+  (save-excursion
+    (epoch-forward-logical-line (1- (or N 1)))
+    (when (= (epoch-forward-logical-line 1) 0)
+      (backward-char))
+    (point)))
+
+(defun epoch-logical-line (&optional remove-comments)
+  "Return logical line at point as string.
+If REMOVE-COMMENTS is non-nil remove line comments
+starting with ?# and ?\\\\."
+  (let ((line (save-excursion
+		(buffer-substring-no-properties
+		 (epoch-logical-line-beginning-position)
+		 (epoch-logical-line-end-position)))))
+    (when remove-comments
+      ;; 2nd pass: Remove stretches of #.*$
+      (setq line (replace-regexp-in-string "\\\\.*\\(?:\n\\|\\'\\)" "" line)
+	    line (replace-regexp-in-string "#.*$" "" line)))
+    line))
+
 ;;;;;;;;;;;;;;;;;;;; Block closure ;;;;;;;;;;;;;;;;;;;;
 (defun epoch-close-block ()
   "Closes code blocks in EPOCH"
   (interactive)
-  (beginning-of-line)
   ;;This is the regex to match
-  (setq block-begin-regexp "^\\([[:blank:]]*\\)begin:\\([a-z][a-z0-9_]+\\)")
-  ;;(setq block-begin-regexp "^[[:space:]]*begin:\\([:alpha:][[:alnum:]_]+\\)")
-  (save-excursion
-    (while (and (not (looking-at block-begin-regexp)) (not (bobp)))
-      ;;Go back until you found a block begin:
-      (forward-line -1))
-    ;;(print (thing-at-point 'line t)) ; DEBUG
-    ;;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Simple-Match-Data.html
-    ;;Match a the line one more time to save the matched group.
-    (string-match block-begin-regexp (thing-at-point 'line t))
-    ;;The two matched groups are then saved to variables
-    (setq block-indent (match-string 1 (thing-at-point 'line t))) ;indentation level of begin
-    (setq block-type (match-string 2 (thing-at-point 'line t))) ;the block type
-    ;;(print block-indent) ; DEBUG
-    )
-  ;;inserts the actual end:...
-  ;;(insert (concat "\nend:" block-type))
-  (insert (concat "\n" block-indent "end:" block-type))
-  )
+  (let ((block-begin/end-regexp "^\\([[:blank:]]*\\)\\(?:\\(begin\\)\\|\\(end\\)\\):\\([a-z][a-z0-9_]+\\)")
+	found
+	line
+	block-indent
+	block-type)
+    (save-excursion
+      (while (and
+	      (setq found (re-search-backward block-begin/end-regexp nil t))
+	      (null (string-match block-begin/end-regexp (setq line (epoch-logical-line t)))))))
+    (if found
+	(progn
+	  (when (match-beginning 3)
+	    (user-error "Stumbled over block end while searching for block beginning"))
+	  (setq block-indent (match-string 1 line)
+		block-type (match-string 4 line))
+	  ;;inserts the actual end:...
+	  ;;(insert (concat "\nend:" block-type))
+	  (let ((beg (epoch-logical-line-beginning-position)))
+	    (setq line (buffer-substring-no-properties beg (point)))
+	    (if (string-match "\\`[[:space:]]*\\'" line)
+		(progn
+		  (goto-char beg)
+		  (insert (concat block-indent "end:" block-type "\n")))
+	      (goto-char (epoch-logical-line-end-position))
+	      (insert (concat "\n" block-indent "end:" block-type)))))
+      (user-error "Fall off the top edge of the world")
+      )))
 
 ;;;;;;;;;;;;;;;;;;;; Syntax Table ;;;;;;;;;;;;;;;;;;;;
 

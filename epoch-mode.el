@@ -1,29 +1,17 @@
 ;;; epoch-mode-el -- major mode for editing input-decks to the EPOCH PIC code.
 ;;; version 0.1
 ;;
+;; (c) 2018, Andréas Sundström
+;;
+;;; Commentary:
+;;
 ;; Created with inspiration from the Mode Tutorial on emacswiki:
 ;; https://www.emacswiki.org/emacs/ModeTutorial
 ;;
-;;
-;;
-;;
-;; (c) 2018, Andréas Sundström
-;;
+;;; Code:
 
-;; Mode hook for use by outside functions
-(defvar epoch-mode-hook nil)
-
-;;
-(defvar epoch-mode-map
-  (let ((epoch-mode-map (make-sparse-keymap)))
-    ;;(define-key epoch-mode-map "\C-j" 'newline-and-indent)
-    (define-key epoch-mode-map "\C-c]" 'epoch-close-block)
-    epoch-mode-map)
-  "Keymap for EPOCH major mode")
-
-;; 
+;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.deck\\'" . epoch-mode))
-
 
 ;;;;;;;;;;;;;;;;;;;; HIGHLIGHTING ;;;;;;;;;;;;;;;;;;;;
 (defconst epoch-font-lock-keywords-1
@@ -31,7 +19,7 @@
    ;'("\\(\\(begin:\\|end:\\).*\\)" . font-lock-bultin-face)
    ;; Some of the basic EOPCH blocks have begin:x end:x, where
    ;; x is one of:
-   ;; control  boundaries  species  laser  fields window  output  
+   ;; control  boundaries  species  laser  fields window  output
    ;; output_global  dist_fn probe  collisions  qed  subset  constant
    ;; Output from (regexp-opt '("..." "...")):
    '("\\_<\\(\\(?:begin:\\|end:\\)\\(?:boundaries\\|co\\(?:llisions\\|n\\(?:stant\\|trol\\)\\)\\|dist_fn\\|fields\\|laser\\|output\\(?:_global\\)?\\|probe\\|qed\\|s\\(?:pecies\\|ubset\\)\\|window\\)\\)\\_>" . font-lock-keyword-face)
@@ -49,8 +37,6 @@
 
 (defvar epoch-font-lock-keywords epoch-font-lock-keywords-1
   "Default highlighting expressions for EPOCH mode.")
-
-
 
 ;;;;;;;;;;;;;;;;;;;; INDENTATION ;;;;;;;;;;;;;;;;;;;;
 (defvar epoch-indent-offset 3) ; Indentation level
@@ -85,7 +71,7 @@
 	  ;;Else [if we're not loking at an "end:" block]:
 	  ;;Iterate backwards until we find an indentation hint:
 	  (while not-indented
-	    (forward-line -1) 
+	    (forward-line -1)
 	    (if (looking-at "^[ \t]*end:")
 		;;This hint indicates that we need to indent at the level of the end: token
 		(progn
@@ -96,7 +82,7 @@
 		  ;;This hint indicates that we need to indent an extra level
 		  (progn
 		    ;;Do the actual indenting:
-		    (setq cur-indent (+ (current-indentation) epoch-indent-offset)) 
+		    (setq cur-indent (+ (current-indentation) epoch-indent-offset))
 		    (setq not-indented nil)) ;breaking the while loop
 		(if (bobp)
 		    ;;Break the backward looking while loop when we've reached the
@@ -130,46 +116,50 @@
 	(indent-line-to 0))
       ))) ; If we didn't see an indentation hint, then allow no indentation
 
+(defun epoch-forward-logical-line_1 ()
+  "Go to the beginning of the next logical line.
+That is `epoch-forward-logical-line' for argument 1."
+  ;; Check for continuation line
+  (forward-line 0)
+  (while (and (let ((line-end (line-end-position)))
+		(save-excursion
+		  ;; Is there a backslash on the current line?
+		  (< (+ (point) (skip-chars-forward "^\\\\" line-end)) line-end)
+		  ))
+	      (= (forward-line) 0))) ;; skip the line with backslash
+  (forward-line))
+
+(defun epoch-forward-logical-line_0 ()
+  "Go to the beginning of the current logical line.
+That is `epoch-forward-logical-line' for argument 0."
+  (forward-line 0)
+  (while (let ((prev-beg (line-beginning-position 0)))
+	   (save-excursion
+	     ;; Is there a backslash on the previous line
+	     (> (+ (point) (skip-chars-backward "^\\\\" prev-beg)) prev-beg)
+	     ))
+    (forward-line -1))
+  0)
+
 (defun epoch-forward-logical-line (&optional N)
-  "Move point like `forward-line' but consider logical lines.
+  "Move point like `forward-line' with arg N but consider logical lines.
 This function takes line continuation through ?\\\\ into account."
   (interactive "p")
   (unless N
     (setq N 1))
   (if (> N 0)
-	(while
-	    (and
-	     (progn
-	       ;; Check for continuation line
-	       (while (and (let ((line-end (line-end-position)))
-			     (save-excursion
-			       (< (+ (point) (skip-chars-forward "^\\\\" line-end))
-				  line-end)))
-			   (= (forward-line) 0)))
-	       (= (forward-line) 0))
-	       ;; Count down
-	     (> (cl-decf N) 0)))
-    (forward-line 0)
-    ;;(print "epoch-forward-logical-line2") ; DEBUG
-    (while
-	(and
-	 (null (bobp))
-	 (and ; <=== I HAVE CHANGED THIS FROM `or` to `and`
-	  ;; Check for continuation line
-	  (let ((prev-beg
-		 (line-beginning-position 0)))
-	    (save-excursion
-	      (> (+ (point) (skip-chars-backward "^\\\\" prev-beg))
-		 prev-beg)))
-	  (and (< N 0)
-	       (when (= (forward-line -1) 0)
-		 (cl-incf N)))))
-      ;;(print "epoch-forward-logical-line3") ; DEBUG
-      ))
+      (while (and (= (epoch-forward-logical-line_1) 0)
+		  (> (cl-decf N) 0)))
+    (epoch-forward-logical-line_0)
+    (while (and (< N 0)
+		(prog1
+		    (= (forward-line -1) 0)
+		  (epoch-forward-logical-line_0)))
+      (cl-incf N)))
   N)
 
 (defun epoch-logical-line-beginning-position (&optional N)
-  "Do the same as `line-beginning-position' but count logical lines."
+  "Do the same as `line-beginning-position' with arg N but count logical lines."
   ;;(interactive) ; DEBUG
   (unless N
     (setq N 0))
@@ -178,7 +168,7 @@ This function takes line continuation through ?\\\\ into account."
     (point)))
 
 (defun epoch-logical-line-end-position (&optional N)
-  "Do the same as `line-end-position' but count logical lines."
+  "Do the same as `line-end-position' with arg N but count logical lines."
   (save-excursion
     (epoch-forward-logical-line (1- (or N 1)))
     (when (= (epoch-forward-logical-line 1) 0)
@@ -202,7 +192,7 @@ starting with ?# and ?\\\\."
 
 ;;;;;;;;;;;;;;;;;;;; Block closure ;;;;;;;;;;;;;;;;;;;;
 (defun epoch-close-block ()
-  "Closes code blocks in EPOCH"
+  "Closes code blocks in EPOCH."
   (interactive)
   ;;This is the regex to match
   (let ((block-begin/end-regexp "^\\([[:blank:]]*\\)\\(?:\\(begin\\)\\|\\(end\\)\\):\\([a-z][a-z0-9_]+\\)")
@@ -216,54 +206,39 @@ starting with ?# and ?\\\\."
 	      (null (string-match block-begin/end-regexp (setq line (epoch-logical-line t)))))))
     (if found
 	(progn
-	  ;;(print "I found something!") ; DEBUG
 	  (when (match-beginning 3)
 	    (user-error "Stumbled over block end while searching for block beginning"))
 	  (setq block-indent (match-string 1 line)
 		block-type (match-string 4 line))
-	  ;;inserts the actual end:...
-	  ;;(insert (concat "\nend:" block-type))
-	  ;;(print (concat "I want to insert " block-type)) ; DEBUG
 	  (let ((beg (epoch-logical-line-beginning-position)))
-	    ;;(print "I'm trying1!") ; DEBUG
 	    (setq line (buffer-substring-no-properties beg (point)))
 	    (if (string-match "\\`[[:space:]]*\\'" line)
 		(progn
-		  ;;(print "I found space!") ; DEBUG
 		  (goto-char beg)
 		  (insert (concat block-indent "end:" block-type "\n")))
-	      ;;(print "I'm trying2!") ; DEBUG
 	      (goto-char (epoch-logical-line-end-position))
-	      ;;(print "I'm trying3!") ; DEBUG
 	      (insert (concat "\n" block-indent "end:" block-type)))))
       (user-error "Fell off the top edge of the world")
       )))
 
-;;;;;;;;;;;;;;;;;;;; Syntax Table ;;;;;;;;;;;;;;;;;;;;
-
-(defvar epoch-mode-syntax-table
-  (let((syn-tab (make-syntax-table)))
-    ;; # used for comments, newline breaks commets
-    (modify-syntax-entry ?# "<" syn-tab)
-    (modify-syntax-entry ?\n ">" syn-tab)
-    ;; \ breaks lines, everything following is ignored
-    ;; (effectively a comments)
-    (modify-syntax-entry ?\\ "<" syn-tab)
-    syn-tab)
-  "Syntax table for epoch-mode")
-
 ;;;;;;;;;;;;;;;;;;;; The epoch-mode function ;;;;;;;;;;;;;;;;;;;;
-(defun epoch-mode ()
-  (interactive)
-  (kill-all-local-variables)
-  (use-local-map epoch-mode-map)
-  (set-syntax-table epoch-mode-syntax-table)
+;;;###autoload
+(define-derived-mode epoch-mode prog-mode "EPOCH"
+  "Major mode for editing EPOCH deck files.
+By default epoch-mode is activated for files with file-extension \".deck\"."
   ;; Set up font-lock
   (set (make-local-variable 'font-lock-defaults) '(epoch-font-lock-keywords))
   ;; Register our indentation function
-  (set (make-local-variable 'indent-line-function) 'epoch-indent-line)  
-  (setq major-mode 'epoch-mode)
-  (setq mode-name "EPOCH")
-  (run-hooks 'epoch-mode-hook))
+  (set (make-local-variable 'indent-line-function) 'epoch-indent-line)
+  ;;;;;;;;;;;;;;;;;;;; Syntax Table ;;;;;;;;;;;;;;;;;;;;
+  ;; # used for comments, newline breaks commets
+  (modify-syntax-entry ?# "<")
+  (modify-syntax-entry ?\n ">")
+  ;; \ breaks lines, everything following is ignored
+  ;; (effectively a comments)
+  (modify-syntax-entry ?\\ "<")
+  ;;;;;;;;;;;;;;;;;;;; Key Bindings ;;;;;;;;;;;;;;;;;;;;
+  (local-set-key "\C-c]" #'epoch-close-block))
 
 (provide 'epoch-mode)
+;;; epoch-mode.el ends here

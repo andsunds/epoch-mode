@@ -70,7 +70,6 @@
 	      ;;Sets the cur-indent to one indentation less
 	      ;;than the previous line (decreasing indentation).
 	      (while (and (not (looking-at "^[ \t]*begin:")) (not (bobp)))
-		;;(print "Have not found begin:")
 		(forward-line -1)
 		)
 	      ;;(forward-line -1)
@@ -81,6 +80,7 @@
 		;;If this is beyond the left margin,
 		;;then we go back to 0 indentation.
 		(setq cur-indent 0)))
+	;;else
 	(save-excursion
 	  ;;Else [if we're not loking at an "end:" block]:
 	  ;;Iterate backwards until we find an indentation hint:
@@ -150,22 +150,27 @@ This function takes line continuation through ?\\\\ into account."
 	       ;; Count down
 	     (> (cl-decf N) 0)))
     (forward-line 0)
+    ;;(print "epoch-forward-logical-line2") ; DEBUG
     (while
 	(and
 	 (null (bobp))
-	 (or
+	 (and ; <=== I HAVE CHANGED THIS FROM `or` to `and`
 	  ;; Check for continuation line
-	  (let ((prev-beg (line-beginning-position 0)))
+	  (let ((prev-beg
+		 (line-beginning-position 0)))
 	    (save-excursion
 	      (> (+ (point) (skip-chars-backward "^\\\\" prev-beg))
 		 prev-beg)))
 	  (and (< N 0)
 	       (when (= (forward-line -1) 0)
-		 (cl-incf N)))))))
+		 (cl-incf N)))))
+      ;;(print "epoch-forward-logical-line3") ; DEBUG
+      ))
   N)
 
 (defun epoch-logical-line-beginning-position (&optional N)
   "Do the same as `line-beginning-position' but count logical lines."
+  ;;(interactive) ; DEBUG
   (unless N
     (setq N 0))
   (save-excursion
@@ -188,6 +193,7 @@ starting with ?# and ?\\\\."
 		(buffer-substring-no-properties
 		 (epoch-logical-line-beginning-position)
 		 (epoch-logical-line-end-position)))))
+    ;;(print "epoch-logical-line") ; DEBUG
     (when remove-comments
       ;; 2nd pass: Remove stretches of #.*$
       (setq line (replace-regexp-in-string "\\\\.*\\(?:\n\\|\\'\\)" "" line)
@@ -210,21 +216,27 @@ starting with ?# and ?\\\\."
 	      (null (string-match block-begin/end-regexp (setq line (epoch-logical-line t)))))))
     (if found
 	(progn
+	  ;;(print "I found something!") ; DEBUG
 	  (when (match-beginning 3)
 	    (user-error "Stumbled over block end while searching for block beginning"))
 	  (setq block-indent (match-string 1 line)
 		block-type (match-string 4 line))
 	  ;;inserts the actual end:...
 	  ;;(insert (concat "\nend:" block-type))
+	  ;;(print (concat "I want to insert " block-type)) ; DEBUG
 	  (let ((beg (epoch-logical-line-beginning-position)))
+	    ;;(print "I'm trying1!") ; DEBUG
 	    (setq line (buffer-substring-no-properties beg (point)))
 	    (if (string-match "\\`[[:space:]]*\\'" line)
 		(progn
+		  ;;(print "I found space!") ; DEBUG
 		  (goto-char beg)
 		  (insert (concat block-indent "end:" block-type "\n")))
+	      ;;(print "I'm trying2!") ; DEBUG
 	      (goto-char (epoch-logical-line-end-position))
+	      ;;(print "I'm trying3!") ; DEBUG
 	      (insert (concat "\n" block-indent "end:" block-type)))))
-      (user-error "Fall off the top edge of the world")
+      (user-error "Fell off the top edge of the world")
       )))
 
 ;;;;;;;;;;;;;;;;;;;; Syntax Table ;;;;;;;;;;;;;;;;;;;;

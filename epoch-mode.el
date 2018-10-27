@@ -1,7 +1,18 @@
-;;; epoch-mode-el -- major mode for editing input-decks to the EPOCH PIC code.
-;;; version 0.1
+;; epoch-mode-el -- major mode for editing input-decks to the EPOCH PIC code.
+;; version 0.2
+;; Copyright (c) 2018, Andréas Sundström
+;;    This program is free software: you can redistribute it and/or modify
+;;    it under the terms of the GNU General Public License as published by
+;;    the Free Software Foundation, either version 3 of the License, or
+;;    (at your option) any later version.
 ;;
-;; (c) 2018, Andréas Sundström
+;;    This program is distributed in the hope that it will be useful,
+;;    but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;    GNU General Public License for more details.
+;;
+;;    You should have received a copy of the GNU General Public License
+;;    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ;;
 ;;; Commentary:
 ;;
@@ -17,11 +28,11 @@
 (defconst epoch-font-lock-keywords-1
   (list
    ;'("\\(\\(begin:\\|end:\\).*\\)" . font-lock-bultin-face)
-   ;; Some of the basic EOPCH blocks have begin:x end:x, where
-   ;; x is one of:
-   ;; control  boundaries  species  laser  fields window  output
+   ;; Some of the basic EOPCH blocks have begin:... end:...,
+   ;; where ... is one of:
+   ;; control  boundaries  species  laser  fields  window  output
    ;; output_global  dist_fn probe  collisions  qed  subset  constant
-   ;; Output from (regexp-opt '("..." "...")):
+   ;; Output from (regexp-opt '("..." ",,," etc.)):
    '("\\_<\\(\\(?:begin:\\|end:\\)\\(?:boundaries\\|co\\(?:llisions\\|n\\(?:stant\\|trol\\)\\)\\|dist_fn\\|fields\\|laser\\|output\\(?:_global\\)?\\|probe\\|qed\\|s\\(?:pecies\\|ubset\\)\\|window\\)\\)\\_>" . font-lock-keyword-face)
    ;; True and False are represented by "T" and "F"
    '("\\<\\(?:T\\|F\\)\\>" . font-lock-constant-face)
@@ -183,7 +194,6 @@ starting with ?# and ?\\\\."
 		(buffer-substring-no-properties
 		 (epoch-logical-line-beginning-position)
 		 (epoch-logical-line-end-position)))))
-    ;;(print "epoch-logical-line") ; DEBUG
     (when remove-comments
       ;; 2nd pass: Remove stretches of #.*$
       (setq line (replace-regexp-in-string "\\\\.*\\(?:\n\\|\\'\\)" "" line)

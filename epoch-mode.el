@@ -1,6 +1,7 @@
 ;; epoch-mode-el -- major mode for editing input-decks to the EPOCH PIC code.
 ;; version 0.2
-;; Copyright (c) 2018, Andréas Sundström
+;;
+;; Copyright (c) 2018   Andréas Sundström, Tobias Zwada
 ;;    This program is free software: you can redistribute it and/or modify
 ;;    it under the terms of the GNU General Public License as published by
 ;;    the Free Software Foundation, either version 3 of the License, or
